@@ -1,0 +1,9 @@
+{
+  "games": 2000,
+  "samples": 40678,
+  "blackWins": 1278,
+  "whiteWins": 722,
+  "draws": 0,
+  "avgMoves": "20.3",
+  "timestamp": "2026-07-05T08:14:58.544Z"
+}

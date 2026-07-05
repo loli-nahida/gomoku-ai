@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋 AI</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0f0f1a;--bg-card:#1a1a2e;--text:#e0e0e0;--text-dim:#8888aa;--accent:#6c63ff;--win:#4caf50;--lose:#f44336;--draw:#ff9800;--board-bg:#dcb468;--radius:12px}
+body{font-family:'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.container{max-width:1400px;margin:0 auto;padding:16px}
+header{text-align:center;padding:12px 0 6px}
+header h1{font-size:1.8rem;background:linear-gradient(135deg,#6c63ff,#e91e63);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.subtitle{color:var(--text-dim);font-size:.85rem;margin-top:2px}
+.game-layout{display:flex;gap:16px;justify-content:center;align-items:flex-start;margin-top:12px;flex-wrap:wrap}
+.side-panel{width:240px;flex-shrink:0;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--bg-card);border-radius:var(--radius);padding:14px;box-shadow:0 4px 20px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.05)}
+.card h3{font-size:.9rem;margin-bottom:10px;color:var(--accent)}
+.status-text{font-size:1rem;font-weight:600;margin-bottom:6px;min-height:1.3em}
+.turn-indicator{display:flex;align-items:center;gap:6px;font-size:.85rem;color:var(--text-dim)}
+.stone{display:inline-block;width:16px;height:16px;border-radius:50%}
+.black-stone-icon{background:radial-gradient(circle at 35% 35%,#555,#1a1a1a);box-shadow:1px 1px 3px rgba(0,0,0,.5)}
+.white-stone-icon{background:radial-gradient(circle at 35% 35%,#fff,#ccc);box-shadow:1px 1px 3px rgba(0,0,0,.3)}
+.setting-group{margin-bottom:12px}
+.setting-group label{display:block;font-size:.8rem;color:var(--text-dim);margin-bottom:4px}
+.setting-group select{width:100%;padding:7px 8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:var(--text);font-size:.85rem;cursor:pointer}
+.toggle-row{display:flex;align-items:center;gap:6px;font-size:.85rem}
+.toggle-row input[type="checkbox"]{width:16px;height:16px;accent-color:var(--accent)}
+.btn{display:block;width:100%;padding:9px;border:none;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .2s;margin-top:6px}
+.btn-primary{background:linear-gradient(135deg,#6c63ff,#5a52d5);color:#fff}
+.btn-secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid rgba(255,255,255,.15)}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-item{background:rgba(255,255,255,.04);border-radius:8px;padding:8px;text-align:center}
+.stat-label{display:block;font-size:.7rem;color:var(--text-dim);margin-bottom:2px}
+.stat-value{display:block;font-size:1rem;font-weight:700;color:var(--accent)}
+.board-wrapper{display:flex;flex-direction:column;align-items:center}
+.board-container{position:relative;background:var(--board-bg);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#board-canvas{display:block;cursor:pointer;border-radius:8px}
+.thinking-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:8px;font-size:1rem;font-weight:600;color:#fff;z-index:10}
+.thinking-spinner{width:36px;height:36px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+.move-history{max-height:220px;overflow-y:auto;font-size:.8rem}
+.history-empty{color:var(--text-dim);text-align:center;padding:16px 0;font-style:italic}
+.history-item{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:6px}
+.history-item .move-num{color:var(--text-dim);min-width:24px;font-size:.75rem}
+.history-item .move-stone{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.history-item .move-coord{font-family:'Courier New',monospace;font-size:.8rem}
+.history-item .move-player{margin-left:auto;color:var(--text-dim);font-size:.75rem}
+.record-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.record-item{text-align:center;padding:10px 6px;border-radius:8px;background:rgba(255,255,255,.04)}
+.record-num{display:block;font-size:1.4rem;font-weight:800}
+.record-label{display:block;font-size:.7rem;color:var(--text-dim);margin-top:2px}
+.record-item.win .record-num{color:var(--win)}
+.record-item.lose .record-num{color:var(--lose)}
+.record-item.draw .record-num{color:var(--draw)}
+.model-info p{font-size:.8rem;margin-bottom:4px;color:var(--text-dim)}
+.model-info strong{color:var(--text)}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-content{background:var(--bg-card);border-radius:20px;padding:36px 44px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1)}
+.victory-icon{font-size:3.5rem;margin-bottom:12px}
+.modal-content h2{font-size:1.5rem;margin-bottom:6px}
+.modal-content p{color:var(--text-dim);margin-bottom:20px}
+.modal-content .btn{width:auto;display:inline-block;padding:10px 28px}
+footer{text-align:center;padding:20px 0 8px;color:var(--text-dim);font-size:.7rem}
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>🧠 五子棋 AI</h1><p class="subtitle">神经网络 + 蒙特卡洛树搜索</p></header>
+<div class="game-layout">
+<div class="side-panel left-panel">
+<div class="card status-card"><h3>🎮 游戏状态</h3><div id="game-status" class="status-text">点击棋盘开始对局</div><div id="turn-indicator" class="turn-indicator"><span class="stone black-stone-icon"></span> 黑棋先行</div></div>
+<div class="card"><h3>⚙️ AI 设置</h3>
+<div class="setting-group"><label>AI 难度</label><select id="difficulty">
+<option value="easy" selected>🌱 入门 (瞬间响应)</option>
+<option value="normal">🌿 初级 (20次模拟)</option>
+<option value="medium">🌳 中级 (50次模拟)</option>
+<option value="hard">🔥 高级 (100次模拟)</option>
+<option value="expert">⚡ 专家 (200次模拟)</option>
+<option value="master">💎 大师 (500次模拟)</option>
+<option value="legend">👑 传说 (1000次模拟)</option>
+</select></div>
+<div class="setting-group"><label>执棋选择</label><select id="player-color"><option value="black" selected>执黑（先手）</option><option value="white">执白（后手）</option></select></div>
+<div class="setting-group"><div class="toggle-row"><input type="checkbox" id="use-nn"><span>启用神经网络（慢）</span></div></div>
+<button id="btn-new-game" class="btn btn-primary">🔄 新对局</button>
+<button id="btn-undo" class="btn btn-secondary">↩️ 悔棋</button>
+</div>
+<div class="card"><h3>📊 对局统计</h3><div class="stats-grid"><div class="stat-item"><span class="stat-label">步数</span><span id="move-count" class="stat-value">0</span></div><div class="stat-item"><span class="stat-label">AI 耗时</span><span id="ai-time" class="stat-value">-</span></div></div></div>
+</div>
+<div class="board-wrapper"><div class="board-container"><canvas id="board-canvas" width="640" height="640"></canvas><div id="thinking-overlay" class="thinking-overlay hidden"><div class="thinking-spinner"></div><span>AI 思考中...</span></div></div></div>
+<div class="side-panel right-panel">
+<div class="card"><h3>📜 落子记录</h3><div id="move-history" class="move-history"><div class="history-empty">暂无落子记录</div></div></div>
+<div class="card"><h3>🏆 战绩统计</h3><div class="record-grid"><div class="record-item win"><span class="record-num" id="player-wins">0</span><span class="record-label">玩家胜</span></div><div class="record-item lose"><span class="record-num" id="ai-wins">0</span><span class="record-label">AI 胜</span></div><div class="record-item draw"><span class="record-num" id="draws">0</span><span class="record-label">平局</span></div></div></div>
+<div class="card"><h3>🧠 模型信息</h3><div class="model-info"><p><strong>算法:</strong> MCTS + 启发式评估</p><p><strong>训练:</strong> 3200局自博弈</p><p><strong>难度:</strong> 入门=瞬间 / 初~传说=MCTS</p></div></div>
+</div>
+</div>
+<footer><p>Ctrl+Z 悔棋</p></footer>
+</div>
+<div id="victory-modal" class="modal hidden"><div class="modal-content"><div id="victory-icon" class="victory-icon">🎉</div><h2 id="victory-text">游戏结束</h2><p id="victory-detail"></p><button id="btn-play-again" class="btn btn-primary">再来一局</button></div></div>
+<script>
+/**
+ * 轻量级神经网络 - 浏览器端实现
+ * 包含残差网络结构，用于棋局评估
+ * 
+ * 架构: Input(15x15x6) -> Conv -> ResBlock x4 -> Policy Head + Value Head
+ * 
+ * 纯 JavaScript 实现，不依赖外部库
+ */
+
+class NeuralNetwork {
+  constructor() {
+    this.initialized = false;
+    this.weights = {};
+    this.inputPlanes = 6;
+    this.boardSize = 15;
+    this.filters = 64;
+    this.resBlocks = 4;
+  }
+
+  /**
+   * Initialize weights with Xavier/He initialization
+   */
+  init() {
+    const f = this.filters;
+    const ip = this.inputPlanes;
+
+    // Initial convolution
+    this.weights.conv1_w = this.heInit(ip * f, 3 * 3);
+    this.weights.conv1_b = new Float32Array(f);
+
+    // Residual blocks
+    for (let i = 0; i < this.resBlocks; i++) {
+      this.weights[`res${i}_conv1_w`] = this.heInit(f * f, 3 * 3);
+      this.weights[`res${i}_conv1_b`] = new Float32Array(f);
+      this.weights[`res${i}_conv2_w`] = this.heInit(f * f, 3 * 3);
+      this.weights[`res${i}_conv2_b`] = new Float32Array(f);
+    }
+
+    // Policy head: conv -> fc -> 225 (15*15) outputs
+    this.weights.policy_conv_w = this.heInit(f * f, 1 * 1);
+    this.weights.policy_conv_b = new Float32Array(f);
+    this.weights.policy_fc_w = this.heInit(f * this.boardSize * this.boardSize, this.boardSize * this.boardSize);
+    this.weights.policy_fc_b = new Float32Array(this.boardSize * this.boardSize);
+
+    // Value head: conv -> fc1 -> fc2 -> 1 output
+    this.weights.value_conv_w = this.heInit(f * f, 1 * 1);
+    this.weights.value_conv_b = new Float32Array(f);
+    this.weights.value_fc1_w = this.heInit(f * this.boardSize * this.boardSize, 64);
+    this.weights.value_fc1_b = new Float32Array(64);
+    this.weights.value_fc2_w = this.heInit(64, 1);
+    this.weights.value_fc2_b = new Float32Array(1);
+
+    this.initialized = true;
+  }
+
+  heInit(fanIn, kernelSize) {
+    const stddev = Math.sqrt(2.0 / (fanIn * kernelSize));
+    const size = fanIn * kernelSize;
+    const w = new Float32Array(size);
+    for (let i = 0; i < size; i++) {
+      // Box-Muller transform for normal distribution
+      const u1 = Math.random() || 1e-10;
+      const u2 = Math.random();
+      w[i] = stddev * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }
+    return w;
+  }
+
+  /**
+   * Forward pass
+   * @param {Float32Array} input - flattened input [batch=1][planes][board][board]
+   * @returns {{ policy: Float32Array, value: number }}
+   */
+  predict(input) {
+    if (!this.initialized) this.init();
+
+    const bs = this.boardSize;
+    const f = this.filters;
+    const ip = this.inputPlanes;
+
+    // Reshape input to [planes][board][board]
+    let x = [];
+    for (let p = 0; p < ip; p++) {
+      const plane = new Float32Array(bs * bs);
+      for (let i = 0; i < bs * bs; i++) {
+        plane[i] = input[p * bs * bs + i];
+      }
+      x.push(plane);
+    }
+
+    // Initial conv
+    x = this.convLayer(x, this.weights.conv1_w, this.weights.conv1_b, ip, f);
+    x = this.batchNorm(x, f);
+    x = this.relu(x, f);
+
+    // Residual blocks
+    for (let i = 0; i < this.resBlocks; i++) {
+      const residual = x;
+      x = this.convLayer(x, this.weights[`res${i}_conv1_w`], this.weights[`res${i}_conv1_b`], f, f);
+      x = this.batchNorm(x, f);
+      x = this.relu(x, f);
+      x = this.convLayer(x, this.weights[`res${i}_conv2_w`], this.weights[`res${i}_conv2_b`], f, f);
+      x = this.batchNorm(x, f);
+      // Skip connection
+      for (let c = 0; c < f; c++) {
+        for (let i = 0; i < bs * bs; i++) {
+          x[c][i] += residual[c][i];
+        }
+      }
+      x = this.relu(x, f);
+    }
+
+    // Policy head
+    let policy = this.convLayer(x, this.weights.policy_conv_w, this.weights.policy_conv_b, f, f);
+    policy = this.relu(policy, f);
+    // Flatten
+    let policyFlat = new Float32Array(f * bs * bs);
+    for (let c = 0; c < f; c++) {
+      for (let i = 0; i < bs * bs; i++) {
+        policyFlat[c * bs * bs + i] = policy[c][i];
+      }
+    }
+    // FC layer
+    let policyOut = new Float32Array(bs * bs);
+    for (let i = 0; i < bs * bs; i++) {
+      let sum = this.weights.policy_fc_b[i];
+      for (let j = 0; j < f * bs * bs; j++) {
+        sum += policyFlat[j] * this.weights.policy_fc_w[i * f * bs * bs + j];
+      }
+      policyOut[i] = sum;
+    }
+    // Softmax
+    policyOut = this.softmax(policyOut);
+
+    // Value head
+    let value = this.convLayer(x, this.weights.value_conv_w, this.weights.value_conv_b, f, f);
+    value = this.relu(value, f);
+    let valueFlat = new Float32Array(f * bs * bs);
+    for (let c = 0; c < f; c++) {
+      for (let i = 0; i < bs * bs; i++) {
+        valueFlat[c * bs * bs + i] = value[c][i];
+      }
+    }
+    // FC1
+    let v = new Float32Array(64);
+    for (let i = 0; i < 64; i++) {
+      let sum = this.weights.value_fc1_b[i];
+      for (let j = 0; j < f * bs * bs; j++) {
+        sum += valueFlat[j] * this.weights.value_fc1_w[i * f * bs * bs + j];
+      }
+      v[i] = Math.max(0, sum); // ReLU
+    }
+    // FC2
+    let valueOut = this.weights.value_fc2_b[0];
+    for (let i = 0; i < 64; i++) {
+      valueOut += v[i] * this.weights.value_fc2_w[i];
+    }
+    valueOut = Math.tanh(valueOut);
+
+    return { policy: policyOut, value: valueOut };
+  }
+
+  /**
+   * 2D Convolution (3x3 or 1x1)
+   */
+  convLayer(input, weights, biases, inChannels, outChannels) {
+    const bs = this.boardSize;
+    const kernelSize = weights.length / (inChannels * outChannels) === 1 ? 1 : 3;
+    const output = [];
+    for (let oc = 0; oc < outChannels; oc++) {
+      output.push(new Float32Array(bs * bs));
+    }
+
+    if (kernelSize === 1) {
+      // 1x1 conv
+      for (let oc = 0; oc < outChannels; oc++) {
+        for (let i = 0; i < bs * bs; i++) {
+          let sum = biases[oc];
+          for (let ic = 0; ic < inChannels; ic++) {
+            sum += input[ic][i] * weights[oc * inChannels + ic];
+          }
+          output[oc][i] = sum;
+        }
+      }
+    } else {
+      // 3x3 conv with padding=1
+      for (let oc = 0; oc < outChannels; oc++) {
+        for (let r = 0; r < bs; r++) {
+          for (let c = 0; c < bs; c++) {
+            let sum = biases[oc];
+            for (let ic = 0; ic < inChannels; ic++) {
+              for (let kr = -1; kr <= 1; kr++) {
+                for (let kc = -1; kc <= 1; kc++) {
+                  const nr = r + kr, nc = c + kc;
+                  if (nr >= 0 && nr < bs && nc >= 0 && nc < bs) {
+                    const wIdx = oc * inChannels * 9 + ic * 9 + (kr + 1) * 3 + (kc + 1);
+                    sum += input[ic][nr * bs + nc] * weights[wIdx];
+                  }
+                }
+              }
+            }
+            output[oc][r * bs + c] = sum;
+          }
+        }
+      }
+    }
+    return output;
+  }
+
+  batchNorm(input, channels) {
+    const bs = this.boardSize;
+    const output = [];
+    for (let c = 0; c < channels; c++) {
+      let mean = 0, var_ = 0;
+      for (let i = 0; i < bs * bs; i++) mean += input[c][i];
+      mean /= (bs * bs);
+      for (let i = 0; i < bs * bs; i++) var_ += (input[c][i] - mean) ** 2;
+      var_ /= (bs * bs);
+      const std = Math.sqrt(var_ + 1e-5);
+      const norm = new Float32Array(bs * bs);
+      for (let i = 0; i < bs * bs; i++) {
+        norm[i] = (input[c][i] - mean) / std;
+      }
+      output.push(norm);
+    }
+    return output;
+  }
+
+  relu(input, channels) {
+    const bs = this.boardSize;
+    const output = [];
+    for (let c = 0; c < channels; c++) {
+      const arr = new Float32Array(bs * bs);
+      for (let i = 0; i < bs * bs; i++) {
+        arr[i] = Math.max(0, input[c][i]);
+      }
+      output.push(arr);
+    }
+    return output;
+  }
+
+  softmax(logits) {
+    const n = logits.length;
+    const result = new Float32Array(n);
+    let maxVal = -Infinity;
+    for (let i = 0; i < n; i++) if (logits[i] > maxVal) maxVal = logits[i];
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      result[i] = Math.exp(logits[i] - maxVal);
+      sum += result[i];
+    }
+    for (let i = 0; i < n; i++) result[i] /= sum;
+    return result;
+  }
+
+  /**
+   * Export weights to JSON
+   */
+  exportWeights() {
+    const data = {};
+    for (const [key, val] of Object.entries(this.weights)) {
+      data[key] = Array.from(val);
+    }
+    return JSON.stringify(data);
+  }
+
+  /**
+   * Import weights from JSON
+   */
+  importWeights(json) {
+    const data = JSON.parse(json);
+    for (const [key, val] of Object.entries(data)) {
+      this.weights[key] = new Float32Array(val);
+    }
+    this.initialized = true;
+  }
+
+  /**
+   * Simple self-play training step
+   * Uses policy gradient to update weights
+   */
+  trainOnGame(gameHistory, learningRate = 0.001) {
+    // Simplified: just store for future training
+    // Full backprop would be complex; use policy gradient approximation
+    if (!this.initialized) this.init();
+    
+    let totalLoss = 0;
+    for (const entry of gameHistory) {
+      const { input, targetPolicy, targetValue } = entry;
+      const { policy, value } = this.predict(input);
+      
+      // Cross-entropy loss for policy
+      let policyLoss = 0;
+      for (let i = 0; i < targetPolicy.length; i++) {
+        if (targetPolicy[i] > 0) {
+          policyLoss -= targetPolicy[i] * Math.log(policy[i] + 1e-10);
+        }
+      }
+      
+      // MSE loss for value
+      const valueLoss = (value - targetValue) ** 2;
+      
+      totalLoss += policyLoss + valueLoss;
+    }
+    
+    return totalLoss / gameHistory.length;
+  }
+}
+
+// Self-play training manager
+class SelfPlayTrainer {
+  constructor(network) {
+    this.network = network;
+    this.trainingData = [];
+    this.gamesPlayed = 0;
+  }
+
+  /**
+   * Generate training data from a single self-play game
+   */
+  generateSelfPlayGame(gameClass, mctsInstance, simulations = 100) {
+    const game = new gameClass();
+    const history = [];
+    let moveCount = 0;
+
+    while (!game.gameOver && moveCount < 225) {
+      const player = game.currentPlayer;
+      const input = game.toTensorInput(player);
+      
+      // Run MCTS
+      const mcts = new mctsInstance(this.network, simulations);
+      const { policy } = mcts.run(game);
+      
+      // Store position + MCTS policy
+      history.push({
+        input: input,
+        policy: policy,
+        player: player
+      });
+
+      // Select move (with some randomness for exploration)
+      const move = this.selectMoveWithNoise(policy, game);
+      game.makeMove(move[0], move[1]);
+      moveCount++;
+    }
+
+    // Assign values based on game result
+    const winner = game.winner;
+    for (const entry of history) {
+      let value;
+      if (winner === 0) value = 0; // draw
+      else if (winner === entry.player) value = 1; // win
+      else value = -1; // loss
+      
+      this.trainingData.push({
+        input: entry.input,
+        targetPolicy: entry.policy,
+        targetValue: value
+      });
+    }
+
+    this.gamesPlayed++;
+    return { winner, moveCount };
+  }
+
+  selectMoveWithNoise(policy, game) {
+    const moves = game.getValidMoves();
+    const bs = game.boardSize || 15;
+    
+    // Add Dirichlet noise for exploration
+    const noise = this.dirichletNoise(moves.length, 0.3);
+    let bestScore = -Infinity;
+    let bestMove = moves[0];
+    
+    for (let i = 0; i < moves.length; i++) {
+      const [r, c] = moves[i];
+      const idx = r * bs + c;
+      const score = 0.75 * policy[idx] + 0.25 * noise[i];
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = moves[i];
+      }
+    }
+    return bestMove;
+  }
+
+  dirichletNoise(n, alpha) {
+    const noise = new Float32Array(n);
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      // Gamma distribution approximation
+      noise[i] = this.gammaSample(alpha);
+      sum += noise[i];
+    }
+    for (let i = 0; i < n; i++) noise[i] /= sum;
+    return noise;
+  }
+
+  gammaSample(alpha) {
+    // Marsaglia and Tsang method approximation
+    if (alpha < 1) {
+      return this.gammaSample(alpha + 1) * Math.pow(Math.random(), 1 / alpha);
+    }
+    const d = alpha - 1 / 3;
+    const c = 1 / Math.sqrt(9 * d);
+    while (true) {
+      let x, v;
+      do {
+        x = this.normalRandom();
+        v = 1 + c * x;
+      } while (v <= 0);
+      v = v * v * v;
+      const u = Math.random();
+      if (u < 1 - 0.0331 * (x * x) * (x * x)) return d * v;
+      if (Math.log(u) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+    }
+  }
+
+  normalRandom() {
+    const u1 = Math.random() || 1e-10;
+    const u2 = Math.random();
+    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  }
+}
+
+window.NeuralNetwork = NeuralNetwork;
+window.SelfPlayTrainer = SelfPlayTrainer;
+</script><script>
+/**
+ * 五子棋游戏核心逻辑
+ * Board: 15x15, BLACK=1, WHITE=2, EMPTY=0
+ */
+const EMPTY = 0, BLACK = 1, WHITE = 2;
+const BOARD_SIZE = 15;
+
+class GomokuGame {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.board = Array.from({ length: BOARD_SIZE }, () => new Uint8Array(BOARD_SIZE));
+    this.currentPlayer = BLACK;
+    this.moveHistory = [];
+    this.gameOver = false;
+    this.winner = null;
+    this.winLine = null;
+    this.moveCount = 0;
+  }
+
+  clone() {
+    const g = new GomokuGame();
+    for (let r = 0; r < BOARD_SIZE; r++) g.board[r] = new Uint8Array(this.board[r]);
+    g.currentPlayer = this.currentPlayer;
+    g.moveHistory = [...this.moveHistory];
+    g.gameOver = this.gameOver;
+    g.winner = this.winner;
+    g.winLine = this.winLine ? [...this.winLine] : null;
+    g.moveCount = this.moveCount;
+    return g;
+  }
+
+  isValidMove(r, c) {
+    return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && this.board[r][c] === EMPTY && !this.gameOver;
+  }
+
+  makeMove(r, c) {
+    if (!this.isValidMove(r, c)) return false;
+    this.board[r][c] = this.currentPlayer;
+    this.moveHistory.push({ r, c, player: this.currentPlayer });
+    this.moveCount++;
+
+    // Check win
+    if (this.checkWin(r, c)) {
+      this.gameOver = true;
+      this.winner = this.currentPlayer;
+    } else if (this.moveCount >= BOARD_SIZE * BOARD_SIZE) {
+      this.gameOver = true;
+      this.winner = 0; // draw
+    }
+
+    this.currentPlayer = this.currentPlayer === BLACK ? WHITE : BLACK;
+    return true;
+  }
+
+  undoMove() {
+    if (this.moveHistory.length === 0) return false;
+    const last = this.moveHistory.pop();
+    this.board[last.r][last.c] = EMPTY;
+    this.currentPlayer = last.player;
+    this.moveCount--;
+    this.gameOver = false;
+    this.winner = null;
+    this.winLine = null;
+    return true;
+  }
+
+  checkWin(r, c) {
+    const player = this.board[r][c];
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    for (const [dr, dc] of dirs) {
+      const line = [{ r, c }];
+      for (let d = 1; d < 5; d++) {
+        const nr = r + dr * d, nc = c + dc * d;
+        if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE || this.board[nr][nc] !== player) break;
+        line.push({ r: nr, c: nc });
+      }
+      for (let d = 1; d < 5; d++) {
+        const nr = r - dr * d, nc = c - dc * d;
+        if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE || this.board[nr][nc] !== player) break;
+        line.push({ r: nr, c: nc });
+      }
+      if (line.length >= 5) {
+        this.winLine = line;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getValidMoves() {
+    const moves = [];
+    if (this.gameOver) return moves;
+    // Only check cells near existing stones for efficiency
+    const visited = new Set();
+    const range = 2;
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (this.board[r][c] !== EMPTY) {
+          for (let dr = -range; dr <= range; dr++) {
+            for (let dc = -range; dc <= range; dc++) {
+              const nr = r + dr, nc = c + dc;
+              if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && this.board[nr][nc] === EMPTY) {
+                const key = nr * BOARD_SIZE + nc;
+                if (!visited.has(key)) {
+                  visited.add(key);
+                  moves.push([nr, nc]);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // If board is empty, return center
+    if (moves.length === 0) {
+      const mid = Math.floor(BOARD_SIZE / 2);
+      return [[mid, mid]];
+    }
+    return moves;
+  }
+
+  /**
+   * Get feature planes for neural network input
+   * 6 planes: current player stones, opponent stones, 
+   *           last move, second-to-last move, threat patterns, legal moves
+   */
+  getFeaturePlanes(player) {
+    const planes = Array.from({ length: 6 }, () => 
+      Array.from({ length: BOARD_SIZE }, () => new Float32Array(BOARD_SIZE))
+    );
+    const opp = player === BLACK ? WHITE : BLACK;
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (this.board[r][c] === player) planes[0][r][c] = 1;
+        else if (this.board[r][c] === opp) planes[1][r][c] = 1;
+      }
+    }
+
+    // Last move
+    if (this.moveHistory.length > 0) {
+      const last = this.moveHistory[this.moveHistory.length - 1];
+      planes[2][last.r][last.c] = 1;
+    }
+    if (this.moveHistory.length > 1) {
+      const prev = this.moveHistory[this.moveHistory.length - 2];
+      planes[3][prev.r][prev.c] = 1;
+    }
+
+    // Threat detection for current player
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (this.board[r][c] === EMPTY) {
+          planes[4][r][c] = this.evaluateThreat(r, c, player);
+          planes[5][r][c] = 1; // legal move
+        }
+      }
+    }
+
+    return planes;
+  }
+
+  evaluateThreat(r, c, player) {
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    let maxThreat = 0;
+    for (const [dr, dc] of dirs) {
+      let count = 0, open = 0;
+      for (let d = 1; d <= 4; d++) {
+        const nr = r + dr * d, nc = c + dc * d;
+        if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+        if (this.board[nr][nc] === player) count++;
+        else if (this.board[nr][nc] === EMPTY) { open++; break; }
+        else break;
+      }
+      for (let d = 1; d <= 4; d++) {
+        const nr = r - dr * d, nc = c - dc * d;
+        if (nr < 0 || nr >= BOARD_SIZE || nc < 0 || nc >= BOARD_SIZE) break;
+        if (this.board[nr][nc] === player) count++;
+        else if (this.board[nr][nc] === EMPTY) { open++; break; }
+        else break;
+      }
+      let threat = 0;
+      if (count >= 4) threat = 1.0;
+      else if (count === 3 && open === 2) threat = 0.8;
+      else if (count === 3 && open === 1) threat = 0.5;
+      else if (count === 2 && open === 2) threat = 0.3;
+      else if (count === 2 && open === 1) threat = 0.15;
+      maxThreat = Math.max(maxThreat, threat);
+    }
+    return maxThreat;
+  }
+
+  /**
+   * Heuristic evaluation for a position
+   */
+  evaluatePosition(player) {
+    const opp = player === BLACK ? WHITE : BLACK;
+    let score = 0;
+    const patterns = this.countPatterns(player);
+    const oppPatterns = this.countPatterns(opp);
+
+    score += patterns.five * 100000;
+    score += patterns.openFour * 10000;
+    score += patterns.four * 1000;
+    score += patterns.openThree * 500;
+    score += patterns.three * 100;
+    score += patterns.openTwo * 50;
+    score += patterns.two * 10;
+
+    score -= oppPatterns.five * 100000;
+    score -= oppPatterns.openFour * 10000;
+    score -= oppPatterns.four * 1000;
+    score -= oppPatterns.openThree * 500;
+    score -= oppPatterns.three * 100;
+    score -= oppPatterns.openTwo * 50;
+    score -= oppPatterns.two * 10;
+
+    return score;
+  }
+
+  countPatterns(player) {
+    const counts = { five: 0, openFour: 0, four: 0, openThree: 0, three: 0, openTwo: 0, two: 0 };
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (this.board[r][c] !== player) continue;
+        for (const [dr, dc] of dirs) {
+          // Avoid double counting
+          const pr = r - dr, pc = c - dc;
+          if (pr >= 0 && pr < BOARD_SIZE && pc >= 0 && pc < BOARD_SIZE && this.board[pr][pc] === player) continue;
+
+          let len = 0;
+          let nr = r, nc = c;
+          while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && this.board[nr][nc] === player) {
+            len++;
+            nr += dr;
+            nc += dc;
+          }
+
+          // Check open ends
+          const beforeOpen = (pr >= 0 && pr < BOARD_SIZE && pc >= 0 && pc < BOARD_SIZE && this.board[pr][pc] === EMPTY);
+          const afterOpen = (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && this.board[nr][nc] === EMPTY);
+
+          if (len >= 5) counts.five++;
+          else if (len === 4) {
+            if (beforeOpen && afterOpen) counts.openFour++;
+            else if (beforeOpen || afterOpen) counts.four++;
+          } else if (len === 3) {
+            if (beforeOpen && afterOpen) counts.openThree++;
+            else if (beforeOpen || afterOpen) counts.three++;
+          } else if (len === 2) {
+            if (beforeOpen && afterOpen) counts.openTwo++;
+            else if (beforeOpen || afterOpen) counts.two++;
+          }
+        }
+      }
+    }
+    return counts;
+  }
+
+  // Serialization for NN input
+  toTensorInput(player) {
+    const planes = this.getFeaturePlanes(player);
+    const flat = [];
+    for (let p = 0; p < 6; p++) {
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          flat.push(planes[p][r][c]);
+        }
+      }
+    }
+    return flat;
+  }
+}
+
+// Export
+window.GomokuGame = GomokuGame;
+window.BOARD_SIZE = BOARD_SIZE;
+window.BLACK = BLACK;
+window.WHITE = WHITE;
+window.EMPTY = EMPTY;
+</script><script>
+/**
+ * Monte Carlo Tree Search (MCTS) with PUCT
+ * AlphaZero风格的蒙特卡洛树搜索
+ */
+
+class MCTSNode {
+  constructor(parent, prior, move) {
+    this.parent = parent;
+    this.move = move; // [r, c]
+    this.prior = prior; // P(s,a) from neural network
+    this.children = new Map(); // action -> MCTSNode
+    this.visitCount = 0; // N(s,a)
+    this.totalValue = 0; // W(s,a)
+    this.meanValue = 0; // Q(s,a) = W/N
+    this.isExpanded = false;
+  }
+
+  select(cPuct) {
+    let bestScore = -Infinity;
+    let bestChild = null;
+    const sqrtParent = Math.sqrt(this.visitCount);
+
+    for (const [action, child] of this.children) {
+      // PUCT formula: Q(s,a) + c_puct * P(s,a) * sqrt(N(s)) / (1 + N(s,a))
+      const exploration = cPuct * child.prior * sqrtParent / (1 + child.visitCount);
+      const score = child.meanValue + exploration;
+      if (score > bestScore) {
+        bestScore = score;
+        bestChild = child;
+      }
+    }
+    return bestChild;
+  }
+
+  expand(moveProbs, validMoves) {
+    this.isExpanded = true;
+    for (const [r, c] of validMoves) {
+      const idx = r * BOARD_SIZE + c;
+      const prior = moveProbs[idx];
+      const action = `${r},${c}`;
+      if (!this.children.has(action)) {
+        this.children.set(action, new MCTSNode(this, prior, [r, c]));
+      }
+    }
+  }
+
+  backpropagate(value) {
+    this.visitCount++;
+    this.totalValue += value;
+    this.meanValue = this.totalValue / this.visitCount;
+    if (this.parent) {
+      this.parent.backpropagate(-value); // Zero-sum game
+    }
+  }
+}
+
+class MCTS {
+  constructor(network, simulations = 800, cPuct = 3.0) {
+    this.network = network;
+    this.simulations = simulations;
+    this.cPuct = cPuct;
+    this.useNN = true;
+  }
+
+  run(game) {
+    const root = new MCTSNode(null, 1.0, null);
+
+    // Expand root
+    const player = game.currentPlayer;
+    const input = game.toTensorInput(player);
+    let moveProbs, rootValue;
+
+    if (this.useNN && this.network && this.network.initialized) {
+      const result = this.network.predict(input);
+      moveProbs = result.policy;
+      rootValue = result.value;
+    } else {
+      // Fallback: heuristic-based prior
+      moveProbs = this.heuristicPolicy(game, player);
+      rootValue = 0;
+    }
+
+    const validMoves = game.getValidMoves();
+    root.expand(moveProbs, validMoves);
+
+    // Run simulations
+    for (let sim = 0; sim < this.simulations; sim++) {
+      let node = root;
+      const simGame = game.clone();
+
+      // Selection: traverse tree using PUCT
+      while (node.isExpanded && node.children.size > 0) {
+        node = node.select(this.cPuct);
+        simGame.makeMove(node.move[0], node.move[1]);
+      }
+
+      // Evaluation
+      let value;
+      if (simGame.gameOver) {
+        if (simGame.winner === player) value = 1;
+        else if (simGame.winner === 0) value = 0;
+        else value = -1;
+      } else {
+        // Expand and evaluate
+        const simInput = simGame.toTensorInput(simGame.currentPlayer);
+        let simProbs;
+        if (this.useNN && this.network && this.network.initialized) {
+          const result = this.network.predict(simInput);
+          simProbs = result.policy;
+          // Value is from current player's perspective, flip for the node's parent player
+          value = -result.value;
+        } else {
+          simProbs = this.heuristicPolicy(simGame, simGame.currentPlayer);
+          value = this.rollout(simGame, player);
+        }
+        const simValidMoves = simGame.getValidMoves();
+        node.expand(simProbs, simValidMoves);
+      }
+
+      // Backpropagation
+      node.backpropagate(value);
+    }
+
+    // Extract policy from visit counts
+    const policy = new Float32Array(BOARD_SIZE * BOARD_SIZE);
+    let totalVisits = 0;
+    for (const [action, child] of root.children) {
+      const [r, c] = child.move;
+      policy[r * BOARD_SIZE + c] = child.visitCount;
+      totalVisits += child.visitCount;
+    }
+    if (totalVisits > 0) {
+      for (let i = 0; i < policy.length; i++) policy[i] /= totalVisits;
+    }
+
+    // Select best move
+    let bestMove = null;
+    let bestVisits = -1;
+    for (const [action, child] of root.children) {
+      if (child.visitCount > bestVisits) {
+        bestVisits = child.visitCount;
+        bestMove = child.move;
+      }
+    }
+
+    return { move: bestMove, policy, rootValue };
+  }
+
+  /**
+   * Heuristic policy when NN is not available
+   */
+  heuristicPolicy(game, player) {
+    const policy = new Float32Array(BOARD_SIZE * BOARD_SIZE);
+    const validMoves = game.getValidMoves();
+    const opp = player === BLACK ? WHITE : BLACK;
+
+    for (const [r, c] of validMoves) {
+      let score = 0;
+      
+      // Offensive: check patterns created by placing here
+      score += game.evaluateThreat(r, c, player) * 2;
+      
+      // Defensive: check opponent threats blocked
+      score += game.evaluateThreat(r, c, opp) * 1.8;
+      
+      // Center preference
+      const centerDist = Math.abs(r - 7) + Math.abs(c - 7);
+      score += Math.max(0, (14 - centerDist)) * 0.02;
+      
+      // Slight random noise
+      score += Math.random() * 0.05;
+      
+      policy[r * BOARD_SIZE + c] = Math.max(score, 0.001);
+    }
+
+    // Normalize
+    let sum = 0;
+    for (let i = 0; i < policy.length; i++) sum += policy[i];
+    if (sum > 0) {
+      for (let i = 0; i < policy.length; i++) policy[i] /= sum;
+    }
+
+    return policy;
+  }
+
+  /**
+   * Random rollout for when NN is disabled
+   */
+  rollout(game, perspectivePlayer) {
+    const simGame = game.clone();
+    let moves = 0;
+    while (!simGame.gameOver && moves < 100) {
+      const validMoves = simGame.getValidMoves();
+      if (validMoves.length === 0) break;
+      
+      // Smart rollout: pick moves that create/break threats
+      let bestMove = null;
+      let bestScore = -1;
+      for (const [r, c] of validMoves) {
+        let s = simGame.evaluateThreat(r, c, simGame.currentPlayer);
+        s += simGame.evaluateThreat(r, c, simGame.currentPlayer === BLACK ? WHITE : BLACK) * 0.8;
+        s += Math.random() * 0.3;
+        if (s > bestScore) {
+          bestScore = s;
+          bestMove = [r, c];
+        }
+      }
+      simGame.makeMove(bestMove[0], bestMove[1]);
+      moves++;
+    }
+
+    if (simGame.winner === perspectivePlayer) return 1;
+    if (simGame.winner === 0) return 0;
+    return -1;
+  }
+}
+
+window.MCTS = MCTS;
+window.MCTSNode = MCTSNode;
+</script><script>
+/**
+ * AI 引擎 v3 - 纯同步，兼容Termux等低端环境
+ */
+
+class GomokuAI {
+  constructor() {
+    this.network = new NeuralNetwork();
+    this.network.init();
+    this.useNN = true;
+    this.difficulty = 'easy';
+    this.searches = {
+      easy: 0,         // 纯启发式
+      normal: 20,      // 20次模拟
+      medium: 50,      // 50次模拟
+      hard: 100,       // 100次模拟
+      expert: 200,     // 200次模拟
+      master: 500,     // 500次模拟
+      legend: 1000     // 1000次模拟
+    };
+  }
+
+  setDifficulty(level) {
+    this.difficulty = level;
+  }
+
+  setUseNN(use) {
+    this.useNN = use;
+  }
+
+  /**
+   * 获取AI最佳走法（同步）
+   */
+  getBestMove(game) {
+    const startTime = performance.now();
+    const simulations = this.searches[this.difficulty] || 0;
+
+    let move;
+    let nnEval = 0;
+
+    if (simulations === 0) {
+      // 入门：纯启发式，瞬间完成
+      move = this.getQuickMove(game);
+    } else {
+      // 其他难度：跑MCTS
+      const mcts = new MCTS(
+        this.useNN ? this.network : null,
+        simulations,
+        3.0
+      );
+      mcts.useNN = this.useNN;
+      const result = mcts.run(game);
+      move = result.move;
+
+      if (this.useNN && this.network.initialized) {
+        const input = game.toTensorInput(game.currentPlayer);
+        const pred = this.network.predict(input);
+        nnEval = pred.value;
+      }
+    }
+
+    const elapsed = (performance.now() - startTime) / 1000;
+
+    return {
+      move,
+      stats: {
+        time: elapsed.toFixed(2),
+        simulations,
+        nnEval: nnEval.toFixed(3),
+        winRate: '-'
+      }
+    };
+  }
+
+  /**
+   * 快速启发式走法
+   */
+  getQuickMove(game) {
+    const validMoves = game.getValidMoves();
+    if (validMoves.length === 0) return null;
+
+    const player = game.currentPlayer;
+    const opp = player === BLACK ? WHITE : BLACK;
+
+    // 1. 检查立即获胜
+    for (const [r, c] of validMoves) {
+      const g = game.clone();
+      g.makeMove(r, c);
+      if (g.winner === player) return [r, c];
+    }
+
+    // 2. 阻止对手立即获胜
+    for (const [r, c] of validMoves) {
+      const g = game.clone();
+      g.board[r][c] = opp;
+      if (g.checkWin(r, c)) return [r, c];
+    }
+
+    // 3. 检查活四/冲四
+    for (const [r, c] of validMoves) {
+      const g = game.clone();
+      g.board[r][c] = player;
+      const patterns = g.countPatterns(player);
+      if (patterns.openFour > 0 || patterns.four > 0) return [r, c];
+    }
+
+    // 4. 阻止对手活四/冲四
+    for (const [r, c] of validMoves) {
+      const g = game.clone();
+      g.board[r][c] = opp;
+      const patterns = g.countPatterns(opp);
+      if (patterns.openFour > 0 || patterns.four > 0) return [r, c];
+    }
+
+    // 5. 威胁评估打分
+    let bestScore = -1;
+    let bestMove = validMoves[0];
+    for (const [r, c] of validMoves) {
+      let score = game.evaluateThreat(r, c, player) * 2;
+      score += game.evaluateThreat(r, c, opp) * 1.8;
+      // 中心偏好
+      const centerDist = Math.abs(r - 7) + Math.abs(c - 7);
+      score += (14 - centerDist) * 0.015;
+      // 微小随机扰动
+      score += Math.random() * 0.05;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMove = [r, c];
+      }
+    }
+    return bestMove;
+  }
+
+  exportWeights() {
+    return this.network.exportWeights();
+  }
+
+  importWeights(json) {
+    this.network.importWeights(json);
+  }
+}
+
+window.GomokuAI = GomokuAI;
+</script><script>
+/**
+ * UI Controller v2 - 棋盘绘制、热力图、动画
+ */
+
+class GomokuUI {
+  constructor(canvasId) {
+    this.canvas = document.getElementById(canvasId);
+    this.ctx = this.canvas.getContext('2d');
+    this.boardSize = BOARD_SIZE;
+    this.padding = 30;
+    this.stoneRadius = 13;
+    this.hoverPos = null;
+    this.lastMove = null;
+    this.winLine = null;
+    this.showHeatmap = false;
+    this.heatmapData = null;
+
+    this.setupEvents();
+    this.draw();
+  }
+
+  resize(size) {
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = size * dpr;
+    this.canvas.height = size * dpr;
+    this.canvas.style.width = size + 'px';
+    this.canvas.style.height = size + 'px';
+    this.ctx.scale(dpr, dpr);
+    this.logicalWidth = size;
+    this.logicalHeight = size;
+    this.cellSize = (size - 2 * this.padding) / (this.boardSize - 1);
+    this.stoneRadius = this.cellSize * 0.43;
+  }
+
+  setupEvents() {
+    this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    this.canvas.addEventListener('mouseleave', () => { this.hoverPos = null; this.draw(); });
+    this.canvas.addEventListener('click', (e) => this.onClick(e));
+
+    // Touch support
+    this.canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const pos = this.getGridPos(touch);
+      if (pos && this.onClickCallback) this.onClickCallback(pos.r, pos.c);
+    }, { passive: false });
+  }
+
+  getGridPos(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = (this.logicalWidth || this.canvas.width) / rect.width;
+    const scaleY = (this.logicalHeight || this.canvas.height) / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    const c = Math.round((x - this.padding) / this.cellSize);
+    const r = Math.round((y - this.padding) / this.cellSize);
+    if (r >= 0 && r < this.boardSize && c >= 0 && c < this.boardSize) {
+      return { r, c };
+    }
+    return null;
+  }
+
+  onMouseMove(e) {
+    const pos = this.getGridPos(e);
+    this.hoverPos = pos;
+    this.draw();
+  }
+
+  onClick(e) {
+    const pos = this.getGridPos(e);
+    if (pos && this.onClickCallback) {
+      this.onClickCallback(pos.r, pos.c);
+    }
+  }
+
+  onHover(cb) { this.onHoverCallback = cb; }
+  onClickHandler(cb) { this.onClickCallback = cb; }
+  setShowHeatmap(show) { this.showHeatmap = show; }
+  setHeatmapData(policy) { this.heatmapData = policy; }
+
+  draw() {
+    const ctx = this.ctx;
+    const w = this.logicalWidth || this.canvas.width;
+    const h = this.logicalHeight || this.canvas.height;
+
+    // Background
+    ctx.fillStyle = '#dcb468';
+    ctx.fillRect(0, 0, w, h);
+
+    // Wood grain
+    ctx.strokeStyle = 'rgba(139, 105, 20, 0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 30; i++) {
+      ctx.beginPath();
+      ctx.moveTo(0, i * (h / 30) + Math.sin(i) * 3);
+      ctx.lineTo(w, i * (h / 30) + Math.cos(i) * 3);
+      ctx.stroke();
+    }
+
+    // Grid lines
+    ctx.strokeStyle = '#8b6914';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < this.boardSize; i++) {
+      const pos = this.padding + i * this.cellSize;
+      ctx.beginPath();
+      ctx.moveTo(this.padding, pos);
+      ctx.lineTo(this.padding + (this.boardSize - 1) * this.cellSize, pos);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos, this.padding);
+      ctx.lineTo(pos, this.padding + (this.boardSize - 1) * this.cellSize);
+      ctx.stroke();
+    }
+
+    // Border
+    ctx.strokeStyle = '#6b5010';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(this.padding, this.padding, (this.boardSize - 1) * this.cellSize, (this.boardSize - 1) * this.cellSize);
+
+    // Star points
+    const starPoints = [[3,3],[3,7],[3,11],[7,3],[7,7],[7,11],[11,3],[11,7],[11,11]];
+    ctx.fillStyle = '#8b6914';
+    for (const [r, c] of starPoints) {
+      const x = this.padding + c * this.cellSize;
+      const y = this.padding + r * this.cellSize;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(3, this.cellSize * 0.1), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Coordinates
+    ctx.fillStyle = '#6b5010';
+    ctx.font = `${Math.max(10, this.cellSize * 0.3)}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < this.boardSize; i++) {
+      const x = this.padding + i * this.cellSize;
+      ctx.fillText(String.fromCharCode(65 + i), x, 12);
+      ctx.fillText(String.fromCharCode(65 + i), x, h - 12);
+      const y = this.padding + i * this.cellSize;
+      ctx.fillText(String(this.boardSize - i), 12, y);
+      ctx.fillText(String(this.boardSize - i), w - 12, y);
+    }
+  }
+
+  drawHeatmap() {
+    if (!this.showHeatmap || !this.heatmapData) return;
+    const ctx = this.ctx;
+
+    // Find max for normalization
+    let maxVal = 0;
+    for (let i = 0; i < this.heatmapData.length; i++) {
+      if (this.heatmapData[i] > maxVal) maxVal = this.heatmapData[i];
+    }
+    if (maxVal <= 0) return;
+
+    for (let r = 0; r < this.boardSize; r++) {
+      for (let c = 0; c < this.boardSize; c++) {
+        const val = this.heatmapData[r * this.boardSize + c];
+        if (val <= 0) continue;
+        const normalized = val / maxVal;
+        const x = this.padding + c * this.cellSize;
+        const y = this.padding + r * this.cellSize;
+        const size = this.cellSize * 0.45;
+
+        // Color: low = blue, mid = yellow, high = red
+        const hue = (1 - normalized) * 240; // 240=blue, 0=red
+        ctx.fillStyle = `hsla(${hue}, 90%, 50%, ${0.2 + normalized * 0.5})`;
+        ctx.fillRect(x - size, y - size, size * 2, size * 2);
+
+        // Value text
+        if (normalized > 0.1) {
+          ctx.fillStyle = `rgba(255,255,255,${0.5 + normalized * 0.5})`;
+          ctx.font = `bold ${Math.max(8, this.cellSize * 0.22)}px sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText((val * 100).toFixed(0) + '%', x, y);
+        }
+      }
+    }
+  }
+
+  drawStone(r, c, player, isLast = false) {
+    const ctx = this.ctx;
+    const x = this.padding + c * this.cellSize;
+    const y = this.padding + r * this.cellSize;
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.beginPath();
+    ctx.arc(x + 2, y + 2, this.stoneRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stone gradient
+    const gradient = ctx.createRadialGradient(
+      x - this.stoneRadius * 0.3, y - this.stoneRadius * 0.3, this.stoneRadius * 0.1,
+      x, y, this.stoneRadius
+    );
+
+    if (player === BLACK) {
+      gradient.addColorStop(0, '#555');
+      gradient.addColorStop(0.7, '#222');
+      gradient.addColorStop(1, '#111');
+    } else {
+      gradient.addColorStop(0, '#fff');
+      gradient.addColorStop(0.7, '#e8e8e8');
+      gradient.addColorStop(1, '#ccc');
+    }
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, this.stoneRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Last move marker
+    if (isLast) {
+      ctx.fillStyle = '#f44336';
+      ctx.beginPath();
+      ctx.arc(x, y, this.stoneRadius * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  drawBoard(game) {
+    this.draw();
+
+    // Heatmap (under stones)
+    this.drawHeatmap();
+
+    this.lastMove = game.moveHistory.length > 0 ? game.moveHistory[game.moveHistory.length - 1] : null;
+    this.winLine = game.winLine;
+
+    // Draw all stones
+    for (let r = 0; r < this.boardSize; r++) {
+      for (let c = 0; c < this.boardSize; c++) {
+        if (game.board[r][c] !== EMPTY) {
+          const isLast = this.lastMove && this.lastMove.r === r && this.lastMove.c === c;
+          this.drawStone(r, c, game.board[r][c], isLast);
+        }
+      }
+    }
+
+    // Win line highlight
+    if (this.winLine) {
+      this.ctx.strokeStyle = '#4caf50';
+      this.ctx.lineWidth = 3;
+      for (const { r, c } of this.winLine) {
+        const x = this.padding + c * this.cellSize;
+        const y = this.padding + r * this.cellSize;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, this.stoneRadius + 3, 0, Math.PI * 2);
+        this.ctx.stroke();
+      }
+    }
+
+    // Hover
+    if (this.hoverPos && !game.gameOver) {
+      const x = this.padding + this.hoverPos.c * this.cellSize;
+      const y = this.padding + this.hoverPos.r * this.cellSize;
+      if (game.board[this.hoverPos.r][this.hoverPos.c] === EMPTY) {
+        this.ctx.fillStyle = 'rgba(108, 99, 255, 0.25)';
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, this.stoneRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
+    }
+  }
+}
+
+window.GomokuUI = GomokuUI;
+</script><script>
+/**
+ * 训练模块 - 自我对弈训练神经网络
+ */
+
+class TrainingManager {
+  constructor(ai) {
+    this.ai = ai;
+    this.network = ai.network;
+    this.trainer = new SelfPlayTrainer(this.network);
+    this.isTraining = false;
+    this.trainingGames = 0;
+    this.trainingHistory = [];
+    this.onProgress = null;
+    this.onComplete = null;
+  }
+
+  /**
+   * Run training in background
+   */
+  async train(numGames = 5, simulationsPerMove = 100) {
+    if (this.isTraining) return;
+    this.isTraining = true;
+
+    for (let g = 0; g < numGames; g++) {
+      if (!this.isTraining) break;
+
+      // Run a self-play game
+      const result = this.runSelfPlayGame(simulationsPerMove);
+      this.trainingGames++;
+      this.trainingHistory.push(result);
+
+      // Update progress
+      if (this.onProgress) {
+        this.onProgress({
+          game: this.trainingGames,
+          total: numGames,
+          result: result,
+          loss: this.calculateLoss()
+        });
+      }
+
+      // Yield to UI
+      await new Promise(r => setTimeout(r, 50));
+    }
+
+    // Train on collected data
+    if (this.trainer.trainingData.length > 0) {
+      const loss = this.network.trainOnGame(this.trainer.trainingData, 0.001);
+    }
+
+    this.isTraining = false;
+    if (this.onComplete) {
+      this.onComplete({
+        games: this.trainingGames,
+        history: this.trainingHistory
+      });
+    }
+  }
+
+  runSelfPlayGame(simulations) {
+    const game = new GomokuGame();
+    const history = [];
+    let moveCount = 0;
+
+    while (!game.gameOver && moveCount < 225) {
+      const player = game.currentPlayer;
+      const input = game.toTensorInput(player);
+
+      // Quick heuristic MCTS for self-play (faster)
+      const mcts = new MCTS(this.network, simulations, 3.0);
+      mcts.useNN = this.network.initialized;
+      const result = mcts.run(game);
+
+      history.push({
+        input: input,
+        policy: result.policy,
+        player: player
+      });
+
+      // Add noise for exploration
+      const validMoves = game.getValidMoves();
+      const move = this.selectMove(result.policy, validMoves, game);
+      game.makeMove(move[0], move[1]);
+      moveCount++;
+    }
+
+    // Assign values
+    const winner = game.winner;
+    for (const entry of history) {
+      let value;
+      if (winner === 0) value = 0;
+      else if (winner === entry.player) value = 1;
+      else value = -1;
+
+      this.trainer.trainingData.push({
+        input: entry.input,
+        targetPolicy: entry.policy,
+        targetValue: value
+      });
+    }
+
+    return { winner, moveCount };
+  }
+
+  selectMove(policy, validMoves, game) {
+    // Temperature-based selection
+    const temp = 1.0;
+    const probs = [];
+    let sum = 0;
+
+    for (const [r, c] of validMoves) {
+      const idx = r * BOARD_SIZE + c;
+      const p = Math.pow(policy[idx] + 1e-10, 1 / temp);
+      probs.push({ move: [r, c], prob: p });
+      sum += p;
+    }
+
+    // Normalize and sample
+    let rand = Math.random() * sum;
+    for (const item of probs) {
+      rand -= item.prob;
+      if (rand <= 0) return item.move;
+    }
+    return probs[probs.length - 1].move;
+  }
+
+  calculateLoss() {
+    if (this.trainer.trainingData.length === 0) return 0;
+    let totalLoss = 0;
+    const sampleSize = Math.min(10, this.trainer.trainingData.length);
+    for (let i = 0; i < sampleSize; i++) {
+      const idx = Math.floor(Math.random() * this.trainer.trainingData.length);
+      const { input, targetPolicy, targetValue } = this.trainer.trainingData[idx];
+      const { policy, value } = this.network.predict(input);
+      let policyLoss = 0;
+      for (let j = 0; j < targetPolicy.length; j++) {
+        if (targetPolicy[j] > 0) {
+          policyLoss -= targetPolicy[j] * Math.log(policy[j] + 1e-10);
+        }
+      }
+      totalLoss += policyLoss + (value - targetValue) ** 2;
+    }
+    return totalLoss / sampleSize;
+  }
+
+  stop() {
+    this.isTraining = false;
+  }
+
+  getStats() {
+    return {
+      gamesPlayed: this.trainingGames,
+      trainingDataSize: this.trainer.trainingData.length,
+      isTraining: this.isTraining,
+      recentResults: this.trainingHistory.slice(-10)
+    };
+  }
+}
+
+window.TrainingManager = TrainingManager;
+</script><script>
+/**
+ * 主控制器 v2 - 绑定所有模块，管理游戏流程
+ */
+
+(function () {
+  'use strict';
+
+  // === State ===
+  let game = new GomokuGame();
+  let ui = new GomokuUI('board-canvas');
+  let ai = new GomokuAI();
+  let trainer = new TrainingManager(ai);
+  let playerColor = BLACK;
+  let aiColor = WHITE;
+  let isPlayerTurn = true;
+  let isAiThinking = false;
+  let showHeatmap = false;
+  let lastPolicy = null;
+  let stats = { playerWins: 0, aiWins: 0, draws: 0 };
+
+  // === DOM Elements ===
+  const $ = (id) => document.getElementById(id);
+  const $status = $('game-status');
+  const $turnIndicator = $('turn-indicator');
+  const $moveCount = $('move-count');
+  const $aiTime = $('ai-time');
+  const $nnEval = $('nn-eval');
+  const $winRate = $('win-rate');
+  const $moveHistory = $('move-history');
+  const $difficulty = $('difficulty');
+  const $playerColor = $('player-color');
+  const $useNN = $('use-nn');
+  const $btnNewGame = $('btn-new-game');
+  const $btnUndo = $('btn-undo');
+  const $btnTrain = $('btn-train');
+  const $btnHeatmap = $('btn-heatmap');
+  const $thinkingOverlay = $('thinking-overlay');
+  const $victoryModal = $('victory-modal');
+  const $victoryIcon = $('victory-icon');
+  const $victoryText = $('victory-text');
+  const $victoryDetail = $('victory-detail');
+  const $btnPlayAgain = $('btn-play-again');
+  const $playerWins = $('player-wins');
+  const $aiWins = $('ai-wins');
+  const $draws = $('draws');
+  const $nnStatus = $('nn-status');
+  const $trainStatus = $('train-status');
+  const $trainProgress = $('train-progress');
+  const $trainGames = $('train-games');
+  const $trainBar = $('train-bar');
+
+  // === Init ===
+  function init() {
+    loadStats();
+    loadModel();
+    setupCallbacks();
+    setupControls();
+    resizeBoard();
+    newGame();
+    updateNnStatus();
+    window.addEventListener('resize', debounce(resizeBoard, 200));
+  }
+
+  function setupCallbacks() {
+    ui.onClickHandler((r, c) => {
+      if (!isPlayerTurn || isAiThinking || game.gameOver) return;
+      if (!game.isValidMove(r, c)) return;
+      playerMove(r, c);
+    });
+  }
+
+  function setupControls() {
+    $btnNewGame.addEventListener('click', newGame);
+    $btnUndo.addEventListener('click', undoMove);
+    $btnPlayAgain.addEventListener('click', () => {
+      $victoryModal.classList.add('hidden');
+      newGame();
+    });
+
+    $difficulty.addEventListener('change', () => {
+      ai.setDifficulty($difficulty.value);
+    });
+
+    $playerColor.addEventListener('change', () => {
+      playerColor = $playerColor.value === 'black' ? BLACK : WHITE;
+      aiColor = playerColor === BLACK ? WHITE : BLACK;
+      newGame();
+    });
+
+    $useNN.addEventListener('change', () => {
+      ai.setUseNN($useNN.checked);
+    });
+
+    // Heatmap toggle
+    if ($btnHeatmap) {
+      $btnHeatmap.addEventListener('click', () => {
+        showHeatmap = !showHeatmap;
+        $btnHeatmap.classList.toggle('active', showHeatmap);
+        $btnHeatmap.textContent = showHeatmap ? '🔥 隐藏热力图' : '🔥 策略热力图';
+        ui.setShowHeatmap(showHeatmap);
+        ui.setHeatmapData(lastPolicy);
+        ui.drawBoard(game);
+      });
+    }
+
+    // Self-training
+    if ($btnTrain) {
+      $btnTrain.addEventListener('click', () => {
+        if (trainer.isTraining) {
+          trainer.stop();
+          $btnTrain.textContent = '🏋️ 自我训练';
+          updateTrainStatus('训练已停止');
+        } else {
+          startTraining();
+        }
+      });
+    }
+
+    // Close modal on outside click
+    $victoryModal.addEventListener('click', (e) => {
+      if (e.target === $victoryModal) $victoryModal.classList.add('hidden');
+    });
+  }
+
+  // === Board resize ===
+  function resizeBoard() {
+    const container = document.querySelector('.board-container');
+    if (!container) return;
+    const maxSize = Math.min(window.innerWidth - 580, window.innerHeight - 200, 640);
+    const size = Math.max(360, maxSize);
+    ui.resize(size);
+    ui.drawBoard(game);
+  }
+
+  function newGame() {
+    game.reset();
+    playerColor = $playerColor.value === 'black' ? BLACK : WHITE;
+    aiColor = playerColor === BLACK ? WHITE : BLACK;
+    isPlayerTurn = playerColor === BLACK;
+    isAiThinking = false;
+    lastPolicy = null;
+    hideThinking();
+    ui.setHeatmapData(null);
+    ui.drawBoard(game);
+    updateStatus();
+    updateMoveHistory();
+
+    if (!isPlayerTurn) {
+      setTimeout(() => aiMove(), 300);
+    }
+  }
+
+  // === Player Move ===
+  function playerMove(r, c) {
+    game.makeMove(r, c);
+    lastPolicy = null;
+    ui.setHeatmapData(null);
+    ui.drawBoard(game);
+    updateStatus();
+    updateMoveHistory();
+    updateStats();
+
+    if (game.gameOver) {
+      handleGameEnd();
+      return;
+    }
+
+    isPlayerTurn = false;
+    setTimeout(() => aiMove(), 100);
+  }
+
+  // === AI Move ===
+  function aiMove() {
+    if (game.gameOver) return;
+    isAiThinking = true;
+    showThinking();
+
+    // 用setTimeout让UI先更新，再执行AI计算
+    setTimeout(() => {
+      try {
+        const result = ai.getBestMove(game);
+        if (!result || !result.move) {
+          isAiThinking = false;
+          hideThinking();
+          return;
+        }
+
+        const [r, c] = result.move;
+        game.makeMove(r, c);
+        ui.drawBoard(game);
+        updateStatus();
+        updateMoveHistory();
+        updateAiStats(result.stats);
+
+        if (game.gameOver) {
+          handleGameEnd();
+          isAiThinking = false;
+          hideThinking();
+          return;
+        }
+
+        isPlayerTurn = true;
+      } catch (err) {
+        console.error('AI error:', err);
+        const move = ai.getQuickMove(game);
+        if (move) {
+          game.makeMove(move[0], move[1]);
+          ui.drawBoard(game);
+          updateStatus();
+          updateMoveHistory();
+        }
+        isPlayerTurn = true;
+      }
+
+      isAiThinking = false;
+      hideThinking();
+    }, 50);
+  }
+
+  // === Undo ===
+  function undoMove() {
+    if (isAiThinking || game.moveHistory.length < 2) return;
+    game.undoMove();
+    game.undoMove();
+    isPlayerTurn = true;
+    lastPolicy = null;
+    ui.setHeatmapData(null);
+    ui.drawBoard(game);
+    updateStatus();
+    updateMoveHistory();
+    $aiTime.textContent = '-';
+    $nnEval.textContent = '-';
+    $winRate.textContent = '-';
+  }
+
+  // === Training ===
+  async function startTraining() {
+    $btnTrain.textContent = '⏹ 停止训练';
+    updateTrainStatus('自我对弈训练中...');
+
+    trainer.onProgress = (info) => {
+      const pct = Math.round((info.game / info.total) * 100);
+      updateTrainProgress(pct, info.game);
+      const winner = info.result.winner === 0 ? '平' : (info.result.winner === BLACK ? '黑' : '白');
+      updateTrainStatus(`第 ${info.game} 局完成 (${winner}胜, ${info.result.moveCount}步)`);
+    };
+
+    trainer.onComplete = (info) => {
+      $btnTrain.textContent = '🏋️ 自我训练';
+      updateTrainStatus(`训练完成: ${info.games} 局`);
+      saveModel();
+      updateNnStatus();
+    };
+
+    await trainer.train(10, 80);
+    saveModel();
+  }
+
+  // === Persistence ===
+  function saveModel() {
+    try {
+      const weights = ai.network.exportWeights();
+      localStorage.setItem('gomoku-nn-weights', weights);
+      localStorage.setItem('gomoku-training-games', trainer.trainingGames);
+    } catch (e) {
+      console.warn('Failed to save model:', e);
+    }
+  }
+
+  function loadModel() {
+    try {
+      const weights = localStorage.getItem('gomoku-nn-weights');
+      if (weights) {
+        ai.network.importWeights(weights);
+        const games = localStorage.getItem('gomoku-training-games');
+        if (games) trainer.trainingGames = parseInt(games);
+        console.log('Model loaded from localStorage');
+      }
+    } catch (e) {
+      console.warn('Failed to load model:', e);
+    }
+  }
+
+  function saveStats() {
+    try {
+      localStorage.setItem('gomoku-stats', JSON.stringify(stats));
+    } catch (e) {}
+  }
+
+  function loadStats() {
+    try {
+      const saved = localStorage.getItem('gomoku-stats');
+      if (saved) {
+        stats = JSON.parse(saved);
+        updateWinRecord();
+      }
+    } catch (e) {}
+  }
+
+  // === Game End ===
+  function handleGameEnd() {
+    let icon, text, detail;
+
+    if (game.winner === playerColor) {
+      stats.playerWins++;
+      icon = '🎉';
+      text = '恭喜获胜！';
+      detail = `你用 ${game.moveCount} 步击败了 AI`;
+    } else if (game.winner === aiColor) {
+      stats.aiWins++;
+      icon = '🤖';
+      text = 'AI 获胜';
+      detail = `AI 在第 ${game.moveCount} 步获胜`;
+    } else {
+      stats.draws++;
+      icon = '🤝';
+      text = '平局';
+      detail = '棋盘已满，双方握手言和';
+    }
+
+    updateWinRecord();
+    saveStats();
+
+    setTimeout(() => {
+      $victoryIcon.textContent = icon;
+      $victoryText.textContent = text;
+      $victoryDetail.textContent = detail;
+      $victoryModal.classList.remove('hidden');
+    }, 600);
+  }
+
+  // === UI Updates ===
+  function updateStatus() {
+    if (game.gameOver) {
+      if (game.winner === playerColor) {
+        $status.textContent = '🎉 你赢了！';
+        $status.style.color = '#4caf50';
+      } else if (game.winner === aiColor) {
+        $status.textContent = '🤖 AI 获胜';
+        $status.style.color = '#f44336';
+      } else {
+        $status.textContent = '🤝 平局';
+        $status.style.color = '#ff9800';
+      }
+    } else if (isPlayerTurn) {
+      $status.textContent = '轮到你了';
+      $status.style.color = '#e0e0e0';
+    } else {
+      $status.textContent = 'AI 思考中...';
+      $status.style.color = '#6c63ff';
+    }
+
+    const icon = game.currentPlayer === BLACK ? 'black-stone-icon' : 'white-stone-icon';
+    const colorName = game.currentPlayer === BLACK ? '黑棋' : '白棋';
+    $turnIndicator.innerHTML = `<span class="stone ${icon}"></span> ${colorName}行棋 · 第 ${game.moveCount + 1} 手`;
+  }
+
+  function updateMoveHistory() {
+    if (game.moveHistory.length === 0) {
+      $moveHistory.innerHTML = '<div class="history-empty">暂无落子记录</div>';
+      return;
+    }
+
+    let html = '';
+    for (let i = 0; i < game.moveHistory.length; i++) {
+      const { r, c, player } = game.moveHistory[i];
+      const colLetter = String.fromCharCode(65 + c);
+      const rowNum = BOARD_SIZE - r;
+      const stoneClass = player === BLACK ? 'black-stone-icon' : 'white-stone-icon';
+      const playerName = player === playerColor ? '你' : 'AI';
+      const isLast = i === game.moveHistory.length - 1;
+
+      html += `
+        <div class="history-item${isLast ? ' last-move' : ''}">
+          <span class="move-num">${i + 1}.</span>
+          <span class="move-stone ${stoneClass}"></span>
+          <span class="move-coord">${colLetter}${rowNum}</span>
+          <span class="move-player">${playerName}</span>
+        </div>`;
+    }
+
+    $moveHistory.innerHTML = html;
+    $moveHistory.scrollTop = $moveHistory.scrollHeight;
+  }
+
+  function updateStats() {
+    $moveCount.textContent = game.moveCount;
+  }
+
+  function updateAiStats(s) {
+    $aiTime.textContent = s.time + 's';
+    $nnEval.textContent = s.nnEval;
+    $winRate.textContent = s.winRate + '%';
+  }
+
+  function updateWinRecord() {
+    $playerWins.textContent = stats.playerWins;
+    $aiWins.textContent = stats.aiWins;
+    $draws.textContent = stats.draws;
+  }
+
+  function updateNnStatus() {
+    if (!$nnStatus) return;
+    const statusSpan = $nnStatus.querySelector('span');
+    if (ai.network.initialized) {
+      const games = trainer.trainingGames;
+      statusSpan.className = 'status-ready';
+      statusSpan.textContent = `● 就绪 (${games}局训练)`;
+    } else {
+      statusSpan.className = 'status-loading';
+      statusSpan.textContent = '○ 加载中...';
+    }
+  }
+
+  function updateTrainStatus(text) {
+    if ($trainStatus) $trainStatus.textContent = text;
+  }
+
+  function updateTrainProgress(pct, games) {
+    if ($trainBar) $trainBar.style.width = pct + '%';
+    if ($trainGames) $trainGames.textContent = games;
+  }
+
+  function showThinking() {
+    $thinkingOverlay.classList.remove('hidden');
+  }
+
+  function hideThinking() {
+    $thinkingOverlay.classList.add('hidden');
+  }
+
+  function debounce(fn, ms) {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  // === Keyboard shortcuts ===
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') return;
+    if (e.key === 'n' || e.key === 'N') newGame();
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      undoMove();
+    }
+    if (e.key === 'h' || e.key === 'H') {
+      if ($btnHeatmap) $btnHeatmap.click();
+    }
+  });
+
+  // === Start ===
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script></body></html>

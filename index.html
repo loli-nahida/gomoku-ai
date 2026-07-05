@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>五子棋 AI - 深度学习人机对战</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧠 五子棋 AI</h1>
+      <p class="subtitle">神经网络 + 蒙特卡洛树搜索 · 浏览器端深度学习</p>
+    </header>
+
+    <div class="game-layout">
+      <!-- Left Panel -->
+      <div class="side-panel left-panel">
+        <div class="card status-card">
+          <h3>🎮 游戏状态</h3>
+          <div id="game-status" class="status-text">点击棋盘开始对局</div>
+          <div id="turn-indicator" class="turn-indicator">
+            <span class="stone black-stone-icon"></span> 黑棋先行
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>⚙️ AI 设置</h3>
+          <div class="setting-group">
+            <label>AI 难度</label>
+            <select id="difficulty">
+              <option value="easy">入门 (200次模拟)</option>
+              <option value="easy" selected>入门 (瞬间响应)</option>
+              <option value="normal">初级 (20次模拟)</option>
+              <option value="medium">中级 (50次模拟)</option>
+              <option value="hard">高级 (100次模拟)</option>
+              <option value="expert">专家 (200次模拟)</option>
+              <option value="master">大师 (500次模拟)</option>
+              <option value="legend">传说 (1000次模拟)</option>
+              <option value="hard">高手 (2000次模拟)</option>
+              <option value="expert">大师 (5000次模拟)</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label>执棋选择</label>
+            <select id="player-color">
+              <option value="black" selected>执黑（先手）</option>
+              <option value="white">执白（后手）</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label>神经网络评估</label>
+            <div class="toggle-row">
+              <input type="checkbox" id="use-nn" checked>
+              <span>启用 NN 评估</span>
+            </div>
+          </div>
+          <button id="btn-new-game" class="btn btn-primary">🔄 新对局</button>
+          <button id="btn-undo" class="btn btn-secondary">↩️ 悔棋</button>
+          <button id="btn-heatmap" class="btn btn-secondary">🔥 策略热力图</button>
+        </div>
+
+        <div class="card">
+          <h3>📊 对局统计</h3>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">步数</span>
+              <span id="move-count" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">AI 耗时</span>
+              <span id="ai-time" class="stat-value">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">NN 评估</span>
+              <span id="nn-eval" class="stat-value">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">胜率预测</span>
+              <span id="win-rate" class="stat-value">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Board -->
+      <div class="board-wrapper">
+        <div class="board-container">
+          <canvas id="board-canvas" width="640" height="640"></canvas>
+          <div id="thinking-overlay" class="thinking-overlay hidden">
+            <div class="thinking-spinner"></div>
+            <span>AI 思考中...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div class="side-panel right-panel">
+        <div class="card">
+          <h3>📜 落子记录</h3>
+          <div id="move-history" class="move-history">
+            <div class="history-empty">暂无落子记录</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🏆 战绩统计</h3>
+          <div class="record-grid">
+            <div class="record-item win">
+              <span class="record-num" id="player-wins">0</span>
+              <span class="record-label">玩家胜</span>
+            </div>
+            <div class="record-item lose">
+              <span class="record-num" id="ai-wins">0</span>
+              <span class="record-label">AI 胜</span>
+            </div>
+            <div class="record-item draw">
+              <span class="record-num" id="draws">0</span>
+              <span class="record-label">平局</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>🏋️ 自我训练</h3>
+          <p class="train-desc">AI 通过对弈自我学习提升</p>
+          <div class="progress-bar">
+            <div id="train-bar" class="progress-fill"></div>
+          </div>
+          <div class="train-info">
+            <span id="train-status">就绪</span>
+            <span>已训练 <strong id="train-games">0</strong> 局</span>
+          </div>
+          <button id="btn-train" class="btn btn-accent">🏋️ 开始训练</button>
+        </div>
+
+        <div class="card">
+          <h3>🧠 模型信息</h3>
+          <div class="model-info">
+            <p><strong>架构:</strong> 5层残差网络</p>
+            <p><strong>输入:</strong> 15×15×6 特征平面</p>
+            <p><strong>搜索:</strong> MCTS + PUCT</p>
+            <p><strong>评估:</strong> 策略网络 + 价值网络</p>
+            <p id="nn-status"><strong>状态:</strong> <span class="status-ready">● 就绪</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>AlphaZero 架构 · 神经网络浏览器端推理 · Monte Carlo Tree Search · 按 H 切换热力图 · Ctrl+Z 悔棋</p>
+    </footer>
+  </div>
+
+  <!-- Victory Modal -->
+  <div id="victory-modal" class="modal hidden">
+    <div class="modal-content">
+      <div id="victory-icon" class="victory-icon">🎉</div>
+      <h2 id="victory-text">游戏结束</h2>
+      <p id="victory-detail"></p>
+      <button id="btn-play-again" class="btn btn-primary">再来一局</button>
+    </div>
+  </div>
+
+  <script src="js/neural-net.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/mcts.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/training.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
