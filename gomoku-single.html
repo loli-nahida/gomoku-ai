@@ -1660,9 +1660,9 @@ window.TrainingManager = TrainingManager;
   const $trainBar = $('train-bar');
 
   // === Init ===
-  function init() {
+  async function init() {
     loadStats();
-    loadModel();
+    await loadModel();
     setupCallbacks();
     setupControls();
     resizeBoard();
@@ -1877,14 +1877,29 @@ window.TrainingManager = TrainingManager;
     }
   }
 
-  function loadModel() {
+  async function loadModel() {
     try {
+      // 优先从 localStorage 加载用户训练的权重
       const weights = localStorage.getItem('gomoku-nn-weights');
       if (weights) {
         ai.network.importWeights(weights);
         const games = localStorage.getItem('gomoku-training-games');
         if (games) trainer.trainingGames = parseInt(games);
         console.log('Model loaded from localStorage');
+        return;
+      }
+      
+      // 尝试从 model-weights.json 加载预训练权重
+      try {
+        const response = await fetch('model-weights.json');
+        if (response.ok) {
+          const data = await response.json();
+          ai.network.importWeights(JSON.stringify(data));
+          console.log('Model loaded from model-weights.json');
+          return;
+        }
+      } catch (fetchErr) {
+        console.log('model-weights.json not available, using random weights');
       }
     } catch (e) {
       console.warn('Failed to load model:', e);

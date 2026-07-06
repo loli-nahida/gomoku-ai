@@ -4,5 +4,7 @@ training-data.bin
 __pycache__/
 *.pyc
 model-weights.json
+model_pytorch.pt
 training-samples.json
 sgf-data/
+embed_weights.py
