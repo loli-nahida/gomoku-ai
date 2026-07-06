@@ -1,1 +1,8 @@
 gomoku-ai-backup.tar.gz
+training_cache.npz
+training-data.bin
+__pycache__/
+*.pyc
+model-weights.json
+training-samples.json
+sgf-data/

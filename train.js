@@ -12,7 +12,7 @@ eval(fs.readFileSync('js/mcts.js', 'utf8').replace(/window\./g, 'global.'));
 const TOTAL_GAMES = parseInt(process.argv[2]) || 100;
 const SIMS = parseInt(process.argv[3]) || 30;
 const SAVE_PATH = 'model-weights.json';
-const SAVE_INTERVAL = 500;
+const SAVE_INTERVAL = 250;
 
 const nn = new NeuralNetwork();
 nn.init();

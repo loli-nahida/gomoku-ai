@@ -1,0 +1,9 @@
+{
+  "numSamples": 0,
+  "sampleSize": 1352,
+  "inputSize": 1350,
+  "policySize": 225,
+  "boardSize": 15,
+  "inputPlanes": 6,
+  "description": "Binary training data: input[1350](uint8, 0/1) + policyIdx(uint8, 0-224) + value(uint8, 0=loss/1=draw/2=win)"
+}
