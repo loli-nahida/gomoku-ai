@@ -1889,18 +1889,23 @@ window.TrainingManager = TrainingManager;
         return;
       }
       
-      // 尝试从 model-weights.json 加载预训练权重
-      try {
-        const response = await fetch('model-weights.json');
-        if (response.ok) {
-          const data = await response.json();
-          ai.network.importWeights(JSON.stringify(data));
-          console.log('Model loaded from model-weights.json');
-          return;
-        }
-      } catch (fetchErr) {
-        console.log('model-weights.json not available, using random weights');
+      // 尝试加载预训练权重（优先GitHub Release，回退本地文件）
+      const modelUrls = [
+        'https://github.com/loli-nahida/gomoku-ai/releases/download/v1.0-model/model-weights.json',
+        'model-weights.json'
+      ];
+      for (const url of modelUrls) {
+        try {
+          const response = await fetch(url);
+          if (response.ok) {
+            const data = await response.json();
+            ai.network.importWeights(JSON.stringify(data));
+            console.log(`Model loaded from ${url}`);
+            return;
+          }
+        } catch (e) { /* try next */ }
       }
+      console.log('No model found, using random weights');
     } catch (e) {
       console.warn('Failed to load model:', e);
     }
