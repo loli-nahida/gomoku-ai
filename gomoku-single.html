@@ -1768,8 +1768,9 @@ window.TrainingManager = TrainingManager;
   let lastMoveTime = 0;
   function playerMove(r, c) {
     const now = Date.now();
-    if (now - lastMoveTime < 300) return; // 防抖：300ms内忽略重复点击
+    if (now - lastMoveTime < 300) return;
     lastMoveTime = now;
+    console.log(`[PLAYER] move (${r},${c}) isPlayerTurn=${isPlayerTurn} isAiThinking=${isAiThinking} gameOver=${game.gameOver}`);
 
     game.makeMove(r, c);
     lastPolicy = null;
@@ -1791,7 +1792,7 @@ window.TrainingManager = TrainingManager;
   // === AI Move ===
   let aiMoveScheduled = false;
   function aiMove() {
-    if (game.gameOver || aiMoveScheduled) return;
+    if (game.gameOver || aiMoveScheduled) { console.log('[AI] blocked', {gameOver: game.gameOver, aiMoveScheduled}); return; }
     aiMoveScheduled = true;
     isAiThinking = true;
     showThinking();
@@ -1801,6 +1802,7 @@ window.TrainingManager = TrainingManager;
       try {
         const result = ai.getBestMove(game);
         if (!result || !result.move) {
+          console.log('[AI] no move');
           isAiThinking = false;
           isPlayerTurn = true;
           aiMoveScheduled = false;
@@ -1809,6 +1811,7 @@ window.TrainingManager = TrainingManager;
         }
 
         const [r, c] = result.move;
+        console.log('[AI] move', r, c, 'gameOver:', game.gameOver);
         game.makeMove(r, c);
         ui.drawBoard(game);
         updateStatus();
