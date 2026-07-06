@@ -1789,8 +1789,10 @@ window.TrainingManager = TrainingManager;
   }
 
   // === AI Move ===
+  let aiMoveScheduled = false;
   function aiMove() {
-    if (game.gameOver) return;
+    if (game.gameOver || aiMoveScheduled) return;
+    aiMoveScheduled = true;
     isAiThinking = true;
     showThinking();
 
@@ -1800,6 +1802,8 @@ window.TrainingManager = TrainingManager;
         const result = ai.getBestMove(game);
         if (!result || !result.move) {
           isAiThinking = false;
+          isPlayerTurn = true;
+          aiMoveScheduled = false;
           hideThinking();
           return;
         }
@@ -1814,11 +1818,13 @@ window.TrainingManager = TrainingManager;
         if (game.gameOver) {
           handleGameEnd();
           isAiThinking = false;
-          isPlayerTurn = true;
+          isPlayerTurn = false;
+          aiMoveScheduled = false;
           hideThinking();
           return;
         }
 
+        isAiThinking = false;
         isPlayerTurn = true;
       } catch (err) {
         console.error('AI error:', err);
@@ -1829,10 +1835,11 @@ window.TrainingManager = TrainingManager;
           updateStatus();
           updateMoveHistory();
         }
+        isAiThinking = false;
         isPlayerTurn = true;
       }
 
-      isAiThinking = false;
+      aiMoveScheduled = false;
       hideThinking();
     }, 50);
   }
