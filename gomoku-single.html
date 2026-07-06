@@ -1220,7 +1220,11 @@ class GomokuUI {
       e.preventDefault();
       const touch = e.touches[0];
       const pos = this.getGridPos(touch);
-      if (pos && this.onClickCallback) this.onClickCallback(pos.r, pos.c);
+      if (pos && this.onClickCallback) {
+        // 检查游戏状态，防止AI思考时玩家误触
+        if (typeof isPlayerTurn !== 'undefined' && (!isPlayerTurn || isAiThinking)) return;
+        this.onClickCallback(pos.r, pos.c);
+      }
     }, { passive: false });
   }
 
@@ -1761,7 +1765,12 @@ window.TrainingManager = TrainingManager;
   }
 
   // === Player Move ===
+  let lastMoveTime = 0;
   function playerMove(r, c) {
+    const now = Date.now();
+    if (now - lastMoveTime < 300) return; // 防抖：300ms内忽略重复点击
+    lastMoveTime = now;
+
     game.makeMove(r, c);
     lastPolicy = null;
     ui.setHeatmapData(null);
@@ -1805,6 +1814,7 @@ window.TrainingManager = TrainingManager;
         if (game.gameOver) {
           handleGameEnd();
           isAiThinking = false;
+          isPlayerTurn = true;
           hideThinking();
           return;
         }
