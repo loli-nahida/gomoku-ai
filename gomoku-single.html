@@ -1215,9 +1215,11 @@ class GomokuUI {
     this.canvas.addEventListener('mouseleave', () => { this.hoverPos = null; this.draw(); });
     this.canvas.addEventListener('click', (e) => this.onClick(e));
 
-    // Touch support
+    // Touch support — 记录时间戳，防止touch+click双重触发
+    this._lastTouchTime = 0;
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      this._lastTouchTime = Date.now();
       const touch = e.touches[0];
       const pos = this.getGridPos(touch);
       if (pos && this.onClickCallback) {
@@ -1249,6 +1251,8 @@ class GomokuUI {
   }
 
   onClick(e) {
+    // 忽略触摸后浏览器合成的click事件
+    if (Date.now() - this._lastTouchTime < 500) return;
     const pos = this.getGridPos(e);
     if (pos && this.onClickCallback) {
       this.onClickCallback(pos.r, pos.c);
@@ -1628,6 +1632,7 @@ window.TrainingManager = TrainingManager;
   let aiColor = WHITE;
   let isPlayerTurn = true;
   let isAiThinking = false;
+  let moveLock = false;  // 防重入锁
   let showHeatmap = false;
   let lastPolicy = null;
   let stats = { playerWins: 0, aiWins: 0, draws: 0 };
@@ -1677,7 +1682,7 @@ window.TrainingManager = TrainingManager;
 
   function setupCallbacks() {
     ui.onClickHandler((r, c) => {
-      if (!isPlayerTurn || isAiThinking || game.gameOver) return;
+      if (!isPlayerTurn || isAiThinking || moveLock || game.gameOver) return;
       if (!game.isValidMove(r, c)) return;
       playerMove(r, c);
     });
@@ -1752,6 +1757,7 @@ window.TrainingManager = TrainingManager;
     aiColor = playerColor === BLACK ? WHITE : BLACK;
     isPlayerTurn = playerColor === BLACK;
     isAiThinking = false;
+    moveLock = false;
     lastPolicy = null;
     hideThinking();
     ui.setHeatmapData(null);
@@ -1770,6 +1776,7 @@ window.TrainingManager = TrainingManager;
     const now = Date.now();
     if (now - lastMoveTime < 300) return;
     lastMoveTime = now;
+    moveLock = true;
     console.log(`[PLAYER] move (${r},${c}) isPlayerTurn=${isPlayerTurn} isAiThinking=${isAiThinking} gameOver=${game.gameOver}`);
 
     game.makeMove(r, c);
@@ -1781,6 +1788,7 @@ window.TrainingManager = TrainingManager;
     updateStats();
 
     if (game.gameOver) {
+      moveLock = false;
       handleGameEnd();
       return;
     }
@@ -1792,7 +1800,7 @@ window.TrainingManager = TrainingManager;
   // === AI Move ===
   let aiMoveScheduled = false;
   function aiMove() {
-    if (game.gameOver || aiMoveScheduled) { console.log('[AI] blocked', {gameOver: game.gameOver, aiMoveScheduled}); return; }
+    if (game.gameOver || aiMoveScheduled) { moveLock = false; console.log('[AI] blocked', {gameOver: game.gameOver, aiMoveScheduled}); return; }
     aiMoveScheduled = true;
     isAiThinking = true;
     showThinking();
@@ -1806,6 +1814,7 @@ window.TrainingManager = TrainingManager;
           isAiThinking = false;
           isPlayerTurn = true;
           aiMoveScheduled = false;
+          moveLock = false;
           hideThinking();
           return;
         }
@@ -1823,6 +1832,7 @@ window.TrainingManager = TrainingManager;
           isAiThinking = false;
           isPlayerTurn = false;
           aiMoveScheduled = false;
+          moveLock = false;
           hideThinking();
           return;
         }
@@ -1843,13 +1853,14 @@ window.TrainingManager = TrainingManager;
       }
 
       aiMoveScheduled = false;
+      moveLock = false;
       hideThinking();
     }, 50);
   }
 
   // === Undo ===
   function undoMove() {
-    if (isAiThinking || game.moveHistory.length < 2) return;
+    if (isAiThinking || moveLock || game.moveHistory.length < 2) return;
     game.undoMove();
     game.undoMove();
     isPlayerTurn = true;
