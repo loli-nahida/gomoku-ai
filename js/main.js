@@ -14,6 +14,7 @@
   let aiColor = WHITE;
   let isPlayerTurn = true;
   let isAiThinking = false;
+  let moveLock = false;  // 防重入锁：防止同一时刻处理多个落子
   let showHeatmap = false;
   let lastPolicy = null;
   let stats = { playerWins: 0, aiWins: 0, draws: 0 };
@@ -63,7 +64,7 @@
 
   function setupCallbacks() {
     ui.onClickHandler((r, c) => {
-      if (!isPlayerTurn || isAiThinking || game.gameOver) return;
+      if (!isPlayerTurn || isAiThinking || moveLock || game.gameOver) return;
       if (!game.isValidMove(r, c)) return;
       playerMove(r, c);
     });
@@ -138,6 +139,7 @@
     aiColor = playerColor === BLACK ? WHITE : BLACK;
     isPlayerTurn = playerColor === BLACK;
     isAiThinking = false;
+    moveLock = false;
     lastPolicy = null;
     hideThinking();
     ui.setHeatmapData(null);
@@ -152,6 +154,7 @@
 
   // === Player Move ===
   function playerMove(r, c) {
+    moveLock = true;  // 锁定，防止重复触发
     game.makeMove(r, c);
     lastPolicy = null;
     ui.setHeatmapData(null);
@@ -161,6 +164,7 @@
     updateStats();
 
     if (game.gameOver) {
+      moveLock = false;
       handleGameEnd();
       return;
     }
@@ -171,7 +175,7 @@
 
   // === AI Move ===
   function aiMove() {
-    if (game.gameOver) return;
+    if (game.gameOver) { moveLock = false; return; }
     isAiThinking = true;
     showThinking();
 
@@ -181,6 +185,7 @@
         const result = ai.getBestMove(game);
         if (!result || !result.move) {
           isAiThinking = false;
+          moveLock = false;
           hideThinking();
           return;
         }
@@ -195,6 +200,7 @@
         if (game.gameOver) {
           handleGameEnd();
           isAiThinking = false;
+          moveLock = false;
           hideThinking();
           return;
         }
@@ -213,13 +219,14 @@
       }
 
       isAiThinking = false;
+      moveLock = false;
       hideThinking();
     }, 50);
   }
 
   // === Undo ===
   function undoMove() {
-    if (isAiThinking || game.moveHistory.length < 2) return;
+    if (isAiThinking || moveLock || game.moveHistory.length < 2) return;
     game.undoMove();
     game.undoMove();
     isPlayerTurn = true;

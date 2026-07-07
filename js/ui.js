@@ -33,13 +33,16 @@ class GomokuUI {
   }
 
   setupEvents() {
+    this._lastTouchTime = 0;
+
     this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
     this.canvas.addEventListener('mouseleave', () => { this.hoverPos = null; this.draw(); });
     this.canvas.addEventListener('click', (e) => this.onClick(e));
 
-    // Touch support
+    // Touch support — set flag so click handler ignores synthetic click
     this.canvas.addEventListener('touchstart', (e) => {
       e.preventDefault();
+      this._lastTouchTime = Date.now();
       const touch = e.touches[0];
       const pos = this.getGridPos(touch);
       if (pos && this.onClickCallback) this.onClickCallback(pos.r, pos.c);
@@ -67,6 +70,8 @@ class GomokuUI {
   }
 
   onClick(e) {
+    // Ignore synthetic click right after touch
+    if (Date.now() - this._lastTouchTime < 500) return;
     const pos = this.getGridPos(e);
     if (pos && this.onClickCallback) {
       this.onClickCallback(pos.r, pos.c);
